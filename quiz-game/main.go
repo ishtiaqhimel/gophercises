@@ -21,6 +21,7 @@ func main() {
 	if err != nil {
 		exit(fmt.Sprintf("failed to open %s file: %q\n", fileName, err.Error()))
 	}
+	defer f.Close()
 
 	data, err := readCSVFile(f)
 	if err != nil {
