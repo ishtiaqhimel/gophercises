@@ -5,7 +5,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/boltdb/bolt"
 	"github.com/go-yaml/yaml"
 )
 
@@ -69,4 +71,31 @@ func YAMLHandler(fileName string, fallback http.Handler) (http.HandlerFunc, erro
 type pathUrl struct {
 	Path string `yaml:"path"`
 	Url  string `yaml:"url"`
+}
+
+func DBHandler(fallback http.Handler) (http.HandlerFunc, error) {
+	db, err := bolt.Open("url.db", 0644, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+
+	pathsToUrls := make(map[string]string)
+	if err := db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("urls"))
+		if bucket == nil {
+			return fmt.Errorf("bucket urls not found")
+		}
+		if err := bucket.ForEach(func(k, v []byte) error {
+			pathsToUrls[string(k)] = string(v)
+			return nil
+		}); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return MapHandler(pathsToUrls, fallback), nil
 }
